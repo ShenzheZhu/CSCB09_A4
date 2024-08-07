@@ -9,8 +9,7 @@
 #include <sys/wait.h>
 #include "record.h"
 
-#define MAX_NAME_LEN 30
-#define MAX_RESPONSE_LEN 11
+#define RESPONSE 11
 
 int get_sunspots(FILE *f, const char *name, unsigned short *psunspots) {  
     record  rec;  
@@ -27,65 +26,29 @@ int get_sunspots(FILE *f, const char *name, unsigned short *psunspots) {
     return 0;  
 }
 
-/*
-void handle_sigterm(int sig) {
-    (void)sig; 
-    keep_running = 0; 
-}
-*/
-
 void term_zombies(int signum) {
     (void)signum; 
     while (waitpid(-1, NULL, WNOHANG) > 0);
 }
 
-void ignore_sigpipe(void) {
-    struct sigaction myaction;
-    myaction.sa_handler = SIG_IGN;
-    sigemptyset(&myaction.sa_mask);
-    myaction.sa_flags = 0;
-    sigaction(SIGPIPE, &myaction, NULL);
-}
 
-
-/*
 void handle_client(int client_socket, const char *customer_file) {
     char buffer[NAME_LEN_MAX+1];
+    ssize_t n;
     unsigned short sunspots;
-    int n = read(client_socket, buffer, NAME_LEN_MAX);
-    //fprintf(stdout, "n is:%d\n", n);
-    buffer[n] = '\0';  
     FILE *f = fopen(customer_file, "rb");
-    if (f != NULL) {
-        if (get_sunspots(f, buffer, &sunspots)) {
-            sprintf(buffer, "%hu\n", sunspots);
-        } else {
-            strcpy(buffer, "none\n");
-        }
-        fclose(f);
-    } else {
+    if (f == NULL) {
         strcpy(buffer, "Error opening customer file\n");
     }
-    write(client_socket, buffer, strlen(buffer)); 
-    close(client_socket); 
-}
-*/
+    while ((n = recv(client_socket, buffer, NAME_LEN_MAX+1, 0)) > 0) {
+        buffer[n] = '\0'; 
 
-void handle_client(int client_socket, const char *customer_file) {
-    char name[MAX_NAME_LEN];
-    ssize_t length;
-    FILE *f = fopen(customer_file, "rb");
-    while ((length = recv(client_socket, name, MAX_NAME_LEN - 1, 0)) > 0) {
-        name[length] = '\0'; // Null-terminate the received string
-
-        if (name[length - 1] == '\n') {
-            name[length - 1] = '\0';  // Remove the newline character
+        if (buffer[n - 1] == '\n') {
+            buffer[n - 1] = '\0';  
         }
-
-        unsigned short sunspots;
-        if (get_sunspots(f, name, &sunspots)) {
-            char response[MAX_RESPONSE_LEN];
-            snprintf(response, MAX_RESPONSE_LEN, "%u\n", sunspots);
+        if (get_sunspots(f, buffer, &sunspots)) {
+            char response[RESPONSE];
+            snprintf(response, RESPONSE, "%hu\n", sunspots);
             send(client_socket, response, strlen(response), 0);
         } else {
             send(client_socket, "none\n", 5, 0);
@@ -93,8 +56,9 @@ void handle_client(int client_socket, const char *customer_file) {
     }
     fclose(f);
     close(client_socket);
-    exit(EXIT_SUCCESS);
+    exit(0);
 }
+
 
 int main(int argc, char *argv[]) {
     int port = atoi(argv[1]);
@@ -129,10 +93,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("Server listening on port %d\n", port);
-
-    //signal(SIGCHLD, term_zombies);
-
     struct sigaction sa;
     sa.sa_handler = term_zombies;
     sigemptyset(&sa.sa_mask);
@@ -158,7 +118,6 @@ int main(int argc, char *argv[]) {
             close(server_socket);
             handle_client(client_socket, file);
         }
-        //term_zombies(0);
         close(client_socket); 
     }
     close(server_socket);

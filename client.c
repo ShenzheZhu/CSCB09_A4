@@ -24,12 +24,14 @@ int connectToServer(const char *server_ip, int port){
     cfd = socket(AF_INET, SOCK_STREAM, 0);
     if(cfd == -1){
         perror("Cannot connect to server.\n"); 
+        close(cfd);
         return 1;
     }
     
     
     if (connect(cfd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
         perror("connect.\n"); 
+        close(cfd);
         return 1;
     }
 
