@@ -42,10 +42,6 @@ void handle_client(int client_socket, const char *customer_file) {
     }
     while ((n = recv(client_socket, buffer, NAME_LEN_MAX+1, 0)) > 0) {
         buffer[n] = '\0'; 
-
-        if (buffer[n - 1] == '\n') {
-            buffer[n - 1] = '\0';  
-        }
         if (get_sunspots(f, buffer, &sunspots)) {
             char response[RESPONSE];
             snprintf(response, RESPONSE, "%hu\n", sunspots);
